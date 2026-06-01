@@ -3,6 +3,7 @@ import csv
 from io import StringIO
 from flask import Flask, render_template, request, redirect, session, Response
 import sqlite3
+from flask import send_from_directory
 
 app = Flask(__name__)
 app.secret_key = "ThisIsASecretKeyForMe:)"
@@ -49,16 +50,9 @@ def login():
             session["user"] = username
             return redirect("/")
         else:
-            return "Wrong login"
+            return render_template("login.html", error="Wrong login")
 
-    return """
-    <p>Personal Health Tracker:</p>
-    <form method="post">
-        <input name="username" placeholder="Username">
-        <input name="password" type="password" placeholder="Password">
-        <button type="submit">Login</button>
-    </form>
-    """
+    return render_template("login.html")
 
 @app.route("/logout")
 def logout():
@@ -313,6 +307,15 @@ def export_sugar():
     )
     
     
+@app.route("/sw.js")
+def sw():
+    return send_from_directory(
+        "static",
+        "sw.js",
+        mimetype="application/javascript"
+    )
+
+
 if __name__ == "__main__":
     init_db()
     app.run(debug=True)

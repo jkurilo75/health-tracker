@@ -1,10 +1,13 @@
-from flask import Flask, render_template, request, redirect
+import os
+from flask import Flask, render_template, request, redirect, session
 import sqlite3
 
 app = Flask(__name__)
+app.secret_key = "ThisIsASecretKeyForMe:)"
+USERNAME = "bilingo"
+PASSWORD = "1234"
 
 DATABASE = "health.db"
-
 
 def init_db():
     conn = sqlite3.connect(DATABASE)
@@ -33,9 +36,39 @@ def init_db():
     conn.close()
 
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+
+        if username == USERNAME and password == PASSWORD:
+            session["user"] = username
+            return redirect("/")
+        else:
+            return "Wrong login"
+
+    return """
+    <p>Personal Health Tracker:</p>
+    <form method="post">
+        <input name="username" placeholder="Username">
+        <input name="password" type="password" placeholder="Password">
+        <button type="submit">Login</button>
+    </form>
+    """
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+
 @app.route("/")
 def home():
-
+    if "user" not in session:
+        return redirect("/login")
+        
     conn = sqlite3.connect(DATABASE)
 
     # Latest blood pressure
@@ -83,6 +116,8 @@ def home():
 
 @app.route("/bp/add", methods=["GET", "POST"])
 def add_bp():
+    if "user" not in session:
+        return redirect("/login")
 
     if request.method == "POST":
 
@@ -111,6 +146,8 @@ def add_bp():
 
 @app.route("/bp/history")
 def bp_history():
+    if "user" not in session:
+        return redirect("/login")
 
     conn = sqlite3.connect(DATABASE)
 
@@ -132,6 +169,8 @@ def bp_history():
 
 @app.route("/sugar/add", methods=["GET", "POST"])
 def add_sugar():
+    if "user" not in session:
+        return redirect("/login")
 
     if request.method == "POST":
 
@@ -156,6 +195,8 @@ def add_sugar():
     
 @app.route("/sugar/history")
 def sugar_history():
+    if "user" not in session:
+        return redirect("/login")
 
     conn = sqlite3.connect(DATABASE)
 
@@ -172,6 +213,8 @@ def sugar_history():
 
 @app.route("/charts")
 def charts():
+    if "user" not in session:
+        return redirect("/login")
 
     conn = sqlite3.connect(DATABASE)
 

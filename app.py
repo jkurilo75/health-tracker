@@ -35,7 +35,50 @@ def init_db():
 
 @app.route("/")
 def home():
-    return render_template("index.html")
+
+    conn = sqlite3.connect(DATABASE)
+
+    # Latest blood pressure
+    bp = conn.execute("""
+        SELECT systolic, diastolic, pulse, recorded_at
+        FROM blood_pressure
+        ORDER BY recorded_at DESC
+        LIMIT 1
+    """).fetchone()
+
+    # Latest blood sugar
+    sugar = conn.execute("""
+        SELECT glucose, unit, context, recorded_at
+        FROM blood_sugar
+        ORDER BY recorded_at DESC
+        LIMIT 1
+    """).fetchone()
+
+    # 7-day BP average
+    bp_avg = conn.execute("""
+        SELECT
+            AVG(systolic),
+            AVG(diastolic)
+        FROM blood_pressure
+        WHERE recorded_at >= datetime('now', '-7 days')
+    """).fetchone()
+
+    # 7-day sugar average
+    sugar_avg = conn.execute("""
+        SELECT AVG(glucose)
+        FROM blood_sugar
+        WHERE recorded_at >= datetime('now', '-7 days')
+    """).fetchone()
+
+    conn.close()
+
+    return render_template(
+        "index.html",
+        bp=bp,
+        sugar=sugar,
+        bp_avg=bp_avg,
+        sugar_avg=sugar_avg
+    )
 
 
 @app.route("/bp/add", methods=["GET", "POST"])

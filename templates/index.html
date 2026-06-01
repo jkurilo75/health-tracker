@@ -1,23 +1,89 @@
 {% extends "base.html" %}
 
+{% block title %}Dashboard{% endblock %}
+
 {% block content %}
 
+<!-- Latest readings -->
+<div class="card mb-3">
+    <div class="card-body">
+
+        <h5 class="card-title">Latest Blood Pressure</h5>
+
+        {% if bp %}
+            <p class="mb-1">
+                <strong>{{ bp[0] }}/{{ bp[1] }}</strong>
+            </p>
+            <small>{{ bp[3][:16] }}</small>
+        {% else %}
+            <p>No data yet</p>
+        {% endif %}
+
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+
+        <h5 class="card-title">Latest Blood Sugar</h5>
+
+        {% if sugar %}
+            <p class="mb-1">
+                <strong>{{ sugar[0] }} {{ sugar[1] }}</strong>
+                ({{ sugar[2] }})
+            </p>
+            <small>{{ sugar[3][:16] }}</small>
+        {% else %}
+            <p>No data yet</p>
+        {% endif %}
+
+    </div>
+</div>
+
+<!-- Averages -->
+<div class="card mb-3">
+    <div class="card-body">
+
+        <h5 class="card-title">7-Day Averages</h5>
+
+        <p>
+            BP:
+            {% if bp_avg[0] %}
+                {{ bp_avg[0]|round(0) }}/{{ bp_avg[1]|round(0) }}
+            {% else %}
+                No data
+            {% endif %}
+        </p>
+
+        <p>
+            Sugar:
+            {% if sugar_avg[0] %}
+                {{ sugar_avg[0]|round(1) }}
+            {% else %}
+                No data
+            {% endif %}
+        </p>
+
+    </div>
+</div>
+
+<!-- Actions -->
 <div class="d-grid gap-3">
 
     <a href="/bp/add" class="btn btn-primary btn-lg">
         Add Blood Pressure
     </a>
 
-    <a href="/bp/history" class="btn btn-secondary btn-lg">
-        Blood Pressure History
-    </a>
-
     <a href="/sugar/add" class="btn btn-success btn-lg">
         Add Blood Sugar
     </a>
 
-    <a href="/sugar/history" class="btn btn-dark btn-lg">
-        Blood Sugar History
+    <a href="/bp/history" class="btn btn-outline-primary btn-lg">
+        BP History
+    </a>
+
+    <a href="/sugar/history" class="btn btn-outline-success btn-lg">
+        Sugar History
     </a>
 
 </div>

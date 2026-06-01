@@ -11,3 +11,13 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   event.respondWith(fetch(event.request));
 });
+
+// Simple daily trigger simulation
+self.addEventListener("message", event => {
+    if (event.data === "SUGAR_REMINDER") {
+        self.registration.showNotification("Health Tracker", {
+            body: "Time to check your blood sugar",
+            icon: "/static/icon-192.png"
+        });
+    }
+});

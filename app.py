@@ -4,6 +4,7 @@ from io import StringIO
 from flask import Flask, render_template, request, redirect, session, Response
 import sqlite3
 from flask import send_from_directory
+from flask import jsonify
 
 app = Flask(__name__)
 app.secret_key = "ThisIsASecretKeyForMe:)"
@@ -314,6 +315,10 @@ def sw():
         "sw.js",
         mimetype="application/javascript"
     )
+
+@app.route("/notify-sugar")
+def notify_sugar():
+    return jsonify({"status": "ok"})
 
 
 if __name__ == "__main__":

@@ -46,7 +46,37 @@ if ("serviceWorker" in navigator) {
         console.log("SW registration failed:", err);
     });
 }
-</script>
 
+async function enableNotifications() {
+    if (!("Notification" in window)) return;
+
+    let permission = await Notification.requestPermission();
+    console.log("Notification permission:", permission);
+}
+
+// Ask once when user opens app
+// Prevent spam (only once per tab session)
+let reminderShown = false;
+
+window.addEventListener("load", () => {
+    if ("Notification" in window && Notification.permission === "default") {
+        enableNotifications();
+    }
+    const now = new Date();
+    const hour = now.getHours();
+
+    // between 07:00 and 09:00
+    if (hour >= 7 && hour < 9 && !reminderShown) {
+        sendSugarReminder();
+        reminderShown = true;
+    }
+});
+
+function sendSugarReminder() {
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage("SUGAR_REMINDER");
+    }
+}
+</script>
 </body>
 </html>

@@ -1,5 +1,7 @@
 import os
-from flask import Flask, render_template, request, redirect, session
+import csv
+from io import StringIO
+from flask import Flask, render_template, request, redirect, session, Response
 import sqlite3
 
 app = Flask(__name__)
@@ -239,8 +241,78 @@ def charts():
     sugar = sugar[::-1]
 
     return render_template("charts.html", bp=bp, sugar=sugar)
+
+
+@app.route("/export/bp")
+def export_bp():
+
+    conn = sqlite3.connect(DATABASE)
+
+    rows = conn.execute("""
+        SELECT recorded_at, systolic, diastolic, pulse
+        FROM blood_pressure
+        ORDER BY recorded_at DESC
+    """).fetchall()
+
+    conn.close()
+
+    output = StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "Date",
+        "Systolic",
+        "Diastolic",
+        "Pulse"
+    ])
+
+    writer.writerows(rows)
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition":
+            "attachment; filename=blood_pressure.csv"
+        }
+    )
     
 
+@app.route("/export/sugar")
+def export_sugar():
+
+    conn = sqlite3.connect(DATABASE)
+
+    rows = conn.execute("""
+        SELECT recorded_at, glucose, unit, context
+        FROM blood_sugar
+        ORDER BY recorded_at DESC
+    """).fetchall()
+
+    conn.close()
+
+    output = StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "Date",
+        "Glucose",
+        "Unit",
+        "Context"
+    ])
+
+    writer.writerows(rows)
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition":
+            "attachment; filename=blood_sugar.csv"
+        }
+    )
+    
+    
 if __name__ == "__main__":
     init_db()
     app.run(debug=True)

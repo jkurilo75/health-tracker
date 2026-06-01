@@ -170,6 +170,34 @@ def sugar_history():
     return render_template("sugar_history.html", readings=readings)
     
 
+@app.route("/charts")
+def charts():
+
+    conn = sqlite3.connect(DATABASE)
+
+    bp = conn.execute("""
+        SELECT recorded_at, systolic, diastolic
+        FROM blood_pressure
+        ORDER BY recorded_at DESC
+        LIMIT 20
+    """).fetchall()
+
+    sugar = conn.execute("""
+        SELECT recorded_at, glucose
+        FROM blood_sugar
+        ORDER BY recorded_at DESC
+        LIMIT 20
+    """).fetchall()
+
+    conn.close()
+
+    # reverse so charts go left → right in time order
+    bp = bp[::-1]
+    sugar = sugar[::-1]
+
+    return render_template("charts.html", bp=bp, sugar=sugar)
+    
+
 if __name__ == "__main__":
     init_db()
     app.run(debug=True)

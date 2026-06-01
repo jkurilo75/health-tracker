@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Charts{% endblock %}
+
+{% block content %}
+
+<h3>Health Trends</h3>
+
+<!-- BP Chart -->
+<canvas id="bpChart"></canvas>
+
+<hr>
+
+<!-- Sugar Chart -->
+<canvas id="sugarChart"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // Blood Pressure Data
+    const bpLabels = {{ bp | map(attribute=0) | list | tojson }};
+    const systolic = {{ bp | map(attribute=1) | list | tojson }};
+    const diastolic = {{ bp | map(attribute=2) | list | tojson }};
+
+    new Chart(document.getElementById("bpChart"), {
+        type: "line",
+        data: {
+            labels: bpLabels,
+            datasets: [
+                {
+                    label: "Systolic",
+                    data: systolic
+                },
+                {
+                    label: "Diastolic",
+                    data: diastolic
+                }
+            ]
+        }
+    });
+
+    // Blood Sugar Data
+    const sugarLabels = {{ sugar | map(attribute=0) | list | tojson }};
+    const sugarValues = {{ sugar | map(attribute=1) | list | tojson }};
+
+    new Chart(document.getElementById("sugarChart"), {
+        type: "line",
+        data: {
+            labels: sugarLabels,
+            datasets: [
+                {
+                    label: "Glucose",
+                    data: sugarValues
+                }
+            ]
+        }
+    });
+</script>
+
+<br>
+
+<a href="/" class="btn btn-primary">
+    Back to Dashboard
+</a>
+
+{% endblock %}

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Blood Pressure History</title>
+</head>
+<body>
+
+<h1>Blood Pressure History</h1>
+
+<table border="1">
+
+<tr>
+    <th>Date</th>
+    <th>Systolic</th>
+    <th>Diastolic</th>
+    <th>Pulse</th>
+</tr>
+
+{% for row in readings %}
+
+<tr>
+    <td>{{ row[1] }}</td>
+    <td>{{ row[2] }}</td>
+    <td>{{ row[3] }}</td>
+    <td>{{ row[4] }}</td>
+</tr>
+
+{% endfor %}
+
+</table>
+
+<p>
+    <a href="/bp/add">Add New Reading</a>
+</p>
+
+<p>
+    <a href="/">Home</a>
+</p>
+
+</body>
+</html>

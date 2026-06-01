@@ -1,46 +1,46 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Add Blood Pressure</title>
-</head>
-<body>
+{% extends "base.html" %}
 
-<h1>Add Blood Pressure Reading</h1>
+{% block title %}Add Blood Pressure{% endblock %}
+
+{% block content %}
 
 <form method="post">
 
-    <p>
+    <div class="mb-3">
+        <label class="form-label">Systolic</label>
+
         <input
             type="number"
+            class="form-control"
             name="systolic"
-            placeholder="Systolic"
             required>
-    </p>
+    </div>
 
-    <p>
+    <div class="mb-3">
+        <label class="form-label">Diastolic</label>
+
         <input
             type="number"
+            class="form-control"
             name="diastolic"
-            placeholder="Diastolic"
             required>
-    </p>
+    </div>
 
-    <p>
+    <div class="mb-3">
+        <label class="form-label">Pulse</label>
+
         <input
             type="number"
-            name="pulse"
-            placeholder="Pulse">
-    </p>
+            class="form-control"
+            name="pulse">
+    </div>
 
-    <button type="submit">
-        Save
+    <button
+        type="submit"
+        class="btn btn-success">
+        Save Reading
     </button>
 
 </form>
 
-<p>
-    <a href="/">Home</a>
-</p>
-
-</body>
-</html>
+{% endblock %}

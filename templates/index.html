@@ -1,19 +1,19 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Health Tracker</title>
-</head>
-<body>
+{% extends "base.html" %}
 
-<h1>Health Tracker</h1>
+{% block title %}Home{% endblock %}
 
-<p>
-    <a href="/bp/add">Add Blood Pressure</a>
-</p>
+{% block content %}
 
-<p>
-    <a href="/bp/history">View History</a>
-</p>
+<div class="d-grid gap-3">
 
-</body>
-</html>
+    <a href="/bp/add" class="btn btn-primary btn-lg">
+        Add Blood Pressure
+    </a>
+
+    <a href="/bp/history" class="btn btn-secondary btn-lg">
+        Blood Pressure History
+    </a>
+
+</div>
+
+{% endblock %}

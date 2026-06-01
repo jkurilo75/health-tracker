@@ -1,41 +1,39 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Blood Pressure History</title>
-</head>
-<body>
+{% extends "base.html" %}
 
-<h1>Blood Pressure History</h1>
+{% block title %}History{% endblock %}
 
-<table border="1">
+{% block content %}
 
-<tr>
-    <th>Date</th>
-    <th>Systolic</th>
-    <th>Diastolic</th>
-    <th>Pulse</th>
-</tr>
+<table class="table table-striped">
 
-{% for row in readings %}
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>BP</th>
+            <th>Pulse</th>
+        </tr>
+    </thead>
 
-<tr>
-    <td>{{ row[1] }}</td>
-    <td>{{ row[2] }}</td>
-    <td>{{ row[3] }}</td>
-    <td>{{ row[4] }}</td>
-</tr>
+    <tbody>
 
-{% endfor %}
+    {% for row in readings %}
+
+        <tr>
+            <td>{{ row[1][:16] }}</td>
+            <td>{{ row[2] }}/{{ row[3] }}</td>
+            <td>{{ row[4] }}</td>
+        </tr>
+
+    {% endfor %}
+
+    </tbody>
 
 </table>
 
-<p>
-    <a href="/bp/add">Add New Reading</a>
-</p>
+<a
+    href="/bp/add"
+    class="btn btn-primary">
+    Add Reading
+</a>
 
-<p>
-    <a href="/">Home</a>
-</p>
-
-</body>
-</html>
+{% endblock %}

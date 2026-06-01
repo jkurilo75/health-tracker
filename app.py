@@ -19,6 +19,16 @@ def init_db():
         )
     """)
 
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS blood_sugar (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            glucose REAL NOT NULL,
+            unit TEXT DEFAULT 'mmol/L',
+            context TEXT
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -76,6 +86,46 @@ def bp_history():
         readings=readings
     )
 
+
+@app.route("/sugar/add", methods=["GET", "POST"])
+def add_sugar():
+
+    if request.method == "POST":
+
+        glucose = request.form["glucose"]
+        unit = request.form["unit"]
+        context = request.form["context"]
+
+        conn = sqlite3.connect(DATABASE)
+
+        conn.execute("""
+            INSERT INTO blood_sugar (glucose, unit, context)
+            VALUES (?, ?, ?)
+        """, (glucose, unit, context))
+
+        conn.commit()
+        conn.close()
+
+        return redirect("/sugar/history")
+
+    return render_template("add_sugar.html")
+    
+    
+@app.route("/sugar/history")
+def sugar_history():
+
+    conn = sqlite3.connect(DATABASE)
+
+    readings = conn.execute("""
+        SELECT *
+        FROM blood_sugar
+        ORDER BY recorded_at DESC
+    """).fetchall()
+
+    conn.close()
+
+    return render_template("sugar_history.html", readings=readings)
+    
 
 if __name__ == "__main__":
     init_db()

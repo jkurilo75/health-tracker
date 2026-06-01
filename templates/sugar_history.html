@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Blood Sugar History{% endblock %}
+
+{% block content %}
+
+<table class="table table-striped">
+
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Glucose</th>
+            <th>Context</th>
+        </tr>
+    </thead>
+
+    <tbody>
+
+    {% for row in readings %}
+
+        <tr>
+            <td>{{ row[1][:16] }}</td>
+            <td>{{ row[2] }} {{ row[3] }}</td>
+            <td>{{ row[4] }}</td>
+        </tr>
+
+    {% endfor %}
+
+    </tbody>
+
+</table>
+
+<a href="/sugar/add" class="btn btn-success">
+    Add Reading
+</a>
+
+{% endblock %}

@@ -19,9 +19,9 @@
     {% for row in readings %}
 
         <tr>
-            <td>{{ row[1][:16] }}</td>
-            <td>{{ row[2] }} {{ row[3] }}</td>
-            <td>{{ row[4] }}</td>
+            <td>{{ row["recorded_at"][:16] }}</td>
+            <td>{{ row["glucose"] }} {{ row["unit"] }}</td>
+            <td>{{ row["context"] }}</td>
         </tr>
 
     {% endfor %}

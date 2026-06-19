@@ -1,7 +1,7 @@
 import os
 import csv
 from io import StringIO
-from flask import Flask, render_template, request, redirect, session, Response
+from flask import Flask, render_template, request, redirect, Response
 import sqlite3
 from flask import send_from_directory
 from flask import jsonify
@@ -9,13 +9,13 @@ from werkzeug.security import generate_password_hash
 from werkzeug.security import check_password_hash
 from datetime import datetime
 from db import query, execute
+from auth import login_required, login_user, logout_user, current_user_id
 
 app = Flask(__name__)
 app.secret_key = "ThisIsASecretKeyForMe:)"
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
@@ -27,8 +27,7 @@ def login():
         )
         
         if user and check_password_hash(user[2], password):
-            session["user_id"] = user[0]
-            session["username"] = user[1]
+            login_user((user[0], user[1]))
             return redirect("/")
         else:
             return render_template("login.html",
@@ -38,7 +37,7 @@ def login():
 
 @app.route("/logout")
 def logout():
-    session.clear()
+    logout_user()
     return redirect("/login")
 
 
@@ -70,10 +69,8 @@ def register():
     
     
 @app.route("/")
+@login_required
 def home():
-    if "user_id" not in session:
-        return redirect("/login")
-        
     # Latest blood pressure
     bp = query("""
             SELECT systolic, diastolic, pulse, recorded_at
@@ -81,7 +78,7 @@ def home():
             WHERE user_id = ?
             ORDER BY recorded_at DESC
             LIMIT 1
-        """, (session["user_id"],), one=True)
+        """, (current_user_id(),), one=True)
 
     # Latest blood sugar
     sugar = query("""
@@ -90,7 +87,7 @@ def home():
         WHERE user_id = ?
         ORDER BY recorded_at DESC
         LIMIT 1
-        """, (session["user_id"],), one=True)
+        """, (current_user_id(),), one=True)
 
     # 7-day BP average
     bp_avg = query("""
@@ -99,14 +96,14 @@ def home():
             AVG(diastolic)
         FROM blood_pressure
         WHERE user_id = ? AND recorded_at >= datetime('now', '-7 days')
-        """, (session["user_id"],), one=True)
+        """, (current_user_id(),), one=True)
 
     # 7-day sugar average
     sugar_avg = query("""
         SELECT AVG(glucose)
         FROM blood_sugar
         WHERE user_id = ? AND recorded_at >= datetime('now', '-7 days')
-        """, (session["user_id"],), one=True)
+        """, (current_user_id(),), one=True)
 
     return render_template(
         "index.html",
@@ -118,10 +115,8 @@ def home():
 
 
 @app.route("/bp/add", methods=["GET", "POST"])
+@login_required
 def add_bp():
-    if "user_id" not in session:
-        return redirect("/login")
-
     if request.method == "POST":
 
         systolic = request.form["systolic"]
@@ -131,7 +126,7 @@ def add_bp():
         execute("""
         INSERT INTO blood_pressure (user_id, systolic, diastolic, pulse, recorded_at)
         VALUES (?, ?, ?, ?, ?)
-        """, (session["user_id"], systolic, diastolic, pulse, datetime.now()))
+        """, (current_user_id(), systolic, diastolic, pulse, datetime.now()))
 
         return redirect("/bp/history")
 
@@ -139,17 +134,15 @@ def add_bp():
 
 
 @app.route("/bp/history")
+@login_required
 def bp_history():
-    if "user_id" not in session:
-        return redirect("/login")
-
     readings = query(
         """
         SELECT *
         FROM blood_pressure
         WHERE user_id = ?
         ORDER BY recorded_at DESC
-        """, (session["user_id"],), one=False)
+        """, (current_user_id(),), one=False)
 
     return render_template(
         "bp_history.html",
@@ -158,10 +151,8 @@ def bp_history():
 
 
 @app.route("/sugar/add", methods=["GET", "POST"])
+@login_required
 def add_sugar():
-    if "user_id" not in session:
-        return redirect("/login")
-
     if request.method == "POST":
 
         glucose = request.form["glucose"]
@@ -173,7 +164,7 @@ def add_sugar():
             VALUES (?, ?, ?, ?, ?)
         """,
         (
-            session["user_id"],
+            current_user_id(),
             glucose,
             unit,
             context,
@@ -186,32 +177,28 @@ def add_sugar():
     
     
 @app.route("/sugar/history")
+@login_required
 def sugar_history():
-    if "user_id" not in session:
-        return redirect("/login")
-
     readings = query("""
         SELECT *
         FROM blood_sugar
         WHERE user_id = ?
         ORDER BY recorded_at DESC
-        """, (session["user_id"],), one=False)
+        """, (current_user_id(),), one=False)
 
     return render_template("sugar_history.html", readings=readings)
     
 
 @app.route("/charts")
+@login_required
 def charts():
-    if "user_id" not in session:
-        return redirect("/login")
-
     bp = query("""
         SELECT recorded_at, systolic, diastolic
         FROM blood_pressure
         WHERE user_id = ?
         ORDER BY recorded_at DESC
         LIMIT 20
-        """, (session["user_id"],), one=False)
+        """, (current_user_id(),), one=False)
 
     sugar = query("""
         SELECT recorded_at, glucose
@@ -219,7 +206,7 @@ def charts():
         WHERE user_id = ?
         ORDER BY recorded_at DESC
         LIMIT 20
-        """, (session["user_id"],), one=False)
+        """, (current_user_id(),), one=False)
 
     # reverse so charts go left → right in time order
     bp = bp[::-1]
@@ -229,16 +216,14 @@ def charts():
 
 
 @app.route("/export/bp")
+@login_required
 def export_bp():
-    if "user_id" not in session:
-        return redirect("/login")
-
     rows = query("""
         SELECT recorded_at, systolic, diastolic, pulse
         FROM blood_pressure
         WHERE user_id = ?
         ORDER BY recorded_at DESC
-        """, (session["user_id"],), one=False)
+        """, (current_user_id(),), one=False)
 
     output = StringIO()
     writer = csv.writer(output)
@@ -263,16 +248,14 @@ def export_bp():
     
 
 @app.route("/export/sugar")
+@login_required
 def export_sugar():
-    if "user_id" not in session:
-        return redirect("/login")
-
     rows = query("""
         SELECT recorded_at, glucose, unit, context
         FROM blood_sugar
         WHERE user_id = ?
         ORDER BY recorded_at DESC
-        """, (session["user_id"],), one=False)
+        """, (current_user_id(),), one=False)
 
     output = StringIO()
     writer = csv.writer(output)

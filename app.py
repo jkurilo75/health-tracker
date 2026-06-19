@@ -5,6 +5,8 @@ from flask import Flask, render_template, request, redirect, session, Response
 import sqlite3
 from flask import send_from_directory
 from flask import jsonify
+from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash
 
 app = Flask(__name__)
 app.secret_key = "ThisIsASecretKeyForMe:)"
@@ -36,6 +38,27 @@ def init_db():
         )
     """)
 
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
+        )
+    """)
+
+    # Check if user already exists
+    user = conn.execute(
+        "SELECT id FROM users WHERE username = ?",
+        (USERNAME,)
+    ).fetchone()
+
+    # Create the user only if it doesn't exist
+    if user is None:
+        conn.execute("""
+            INSERT INTO users (username, password)
+            VALUES (?, ?)
+            """, (USERNAME, generate_password_hash(PASSWORD)))
+
     conn.commit()
     conn.close()
 
@@ -47,11 +70,23 @@ def login():
         username = request.form["username"]
         password = request.form["password"]
 
-        if username == USERNAME and password == PASSWORD:
-            session["user"] = username
+        conn = sqlite3.connect(DATABASE)
+
+        user = conn.execute("""
+            SELECT id, username, password
+            FROM users
+            WHERE username = ?
+        """, (username,)).fetchone()
+
+        conn.close()
+
+        if user and check_password_hash(user[2], password):
+            session["user_id"] = user[0]
+            session["username"] = user[1]
             return redirect("/")
         else:
-            return render_template("login.html", error="Wrong login")
+            return render_template("login.html",
+                                   error="Wrong login")
 
     return render_template("login.html")
 
@@ -63,7 +98,7 @@ def logout():
 
 @app.route("/")
 def home():
-    if "user" not in session:
+    if "user_id" not in session:
         return redirect("/login")
         
     conn = sqlite3.connect(DATABASE)
@@ -72,17 +107,25 @@ def home():
     bp = conn.execute("""
         SELECT systolic, diastolic, pulse, recorded_at
         FROM blood_pressure
+        WHERE user_id = ?
         ORDER BY recorded_at DESC
         LIMIT 1
-    """).fetchone()
+        """,
+        (
+            session["user_id"],
+        )).fetchone()
 
     # Latest blood sugar
     sugar = conn.execute("""
         SELECT glucose, unit, context, recorded_at
         FROM blood_sugar
+        WHERE user_id = ?
         ORDER BY recorded_at DESC
         LIMIT 1
-    """).fetchone()
+        """,
+        (
+            session["user_id"],
+        )).fetchone()
 
     # 7-day BP average
     bp_avg = conn.execute("""
@@ -90,15 +133,21 @@ def home():
             AVG(systolic),
             AVG(diastolic)
         FROM blood_pressure
-        WHERE recorded_at >= datetime('now', '-7 days')
-    """).fetchone()
+        WHERE user_id = ? AND recorded_at >= datetime('now', '-7 days')
+        """,
+        (
+            session["user_id"],
+        )).fetchone()
 
     # 7-day sugar average
     sugar_avg = conn.execute("""
         SELECT AVG(glucose)
         FROM blood_sugar
-        WHERE recorded_at >= datetime('now', '-7 days')
-    """).fetchone()
+        WHERE user_id = ? AND recorded_at >= datetime('now', '-7 days')
+        """,
+        (
+            session["user_id"],
+        )).fetchone()
 
     conn.close()
 
@@ -113,7 +162,7 @@ def home():
 
 @app.route("/bp/add", methods=["GET", "POST"])
 def add_bp():
-    if "user" not in session:
+    if "user_id" not in session:
         return redirect("/login")
 
     if request.method == "POST":
@@ -124,14 +173,18 @@ def add_bp():
 
         conn = sqlite3.connect(DATABASE)
 
-        conn.execute(
-            """
-            INSERT INTO blood_pressure
-            (systolic, diastolic, pulse)
-            VALUES (?, ?, ?)
-            """,
-            (systolic, diastolic, pulse)
-        )
+        conn.execute("""
+        INSERT INTO blood_pressure
+        (user_id, systolic, diastolic, pulse, recorded_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            session["user_id"],
+            systolic,
+            diastolic,
+            pulse,
+            date
+        ))
 
         conn.commit()
         conn.close()
@@ -143,7 +196,7 @@ def add_bp():
 
 @app.route("/bp/history")
 def bp_history():
-    if "user" not in session:
+    if "user_id" not in session:
         return redirect("/login")
 
     conn = sqlite3.connect(DATABASE)
@@ -152,9 +205,12 @@ def bp_history():
         """
         SELECT *
         FROM blood_pressure
+        WHERE user_id = ?
         ORDER BY recorded_at DESC
-        """
-    ).fetchall()
+        """,
+        (
+            session["user_id"],
+        )).fetchall()
 
     conn.close()
 
@@ -166,7 +222,7 @@ def bp_history():
 
 @app.route("/sugar/add", methods=["GET", "POST"])
 def add_sugar():
-    if "user" not in session:
+    if "user_id" not in session:
         return redirect("/login")
 
     if request.method == "POST":
@@ -178,9 +234,16 @@ def add_sugar():
         conn = sqlite3.connect(DATABASE)
 
         conn.execute("""
-            INSERT INTO blood_sugar (glucose, unit, context)
-            VALUES (?, ?, ?)
-        """, (glucose, unit, context))
+            INSERT INTO blood_sugar (user_id, glucose, unit, context, recorded_at)
+            VALUES (?, ?, ?, ?)
+        """,
+        (
+            session["user_id"],
+            glucose,
+            unit,
+            context,
+            date
+        ))
 
         conn.commit()
         conn.close()
@@ -192,7 +255,7 @@ def add_sugar():
     
 @app.route("/sugar/history")
 def sugar_history():
-    if "user" not in session:
+    if "user_id" not in session:
         return redirect("/login")
 
     conn = sqlite3.connect(DATABASE)
@@ -200,8 +263,12 @@ def sugar_history():
     readings = conn.execute("""
         SELECT *
         FROM blood_sugar
+        WHERE user_id = ?
         ORDER BY recorded_at DESC
-    """).fetchall()
+        """,
+        (
+            session["user_id"],
+        )).fetchall()
 
     conn.close()
 
@@ -210,7 +277,7 @@ def sugar_history():
 
 @app.route("/charts")
 def charts():
-    if "user" not in session:
+    if "user_id" not in session:
         return redirect("/login")
 
     conn = sqlite3.connect(DATABASE)
@@ -218,16 +285,24 @@ def charts():
     bp = conn.execute("""
         SELECT recorded_at, systolic, diastolic
         FROM blood_pressure
+        WHERE user_id = ?
         ORDER BY recorded_at DESC
         LIMIT 20
-    """).fetchall()
+        """,
+        (
+            session["user_id"],
+        )).fetchall()
 
     sugar = conn.execute("""
         SELECT recorded_at, glucose
         FROM blood_sugar
+        WHERE user_id = ?
         ORDER BY recorded_at DESC
         LIMIT 20
-    """).fetchall()
+        """,
+        (
+            session["user_id"],
+        )).fetchall()
 
     conn.close()
 
@@ -240,14 +315,20 @@ def charts():
 
 @app.route("/export/bp")
 def export_bp():
+    if "user_id" not in session:
+        return redirect("/login")
 
     conn = sqlite3.connect(DATABASE)
 
     rows = conn.execute("""
         SELECT recorded_at, systolic, diastolic, pulse
         FROM blood_pressure
+        WHERE user_id = ?
         ORDER BY recorded_at DESC
-    """).fetchall()
+        """,
+        (
+            session["user_id"],
+        )).fetchall()
 
     conn.close()
 
@@ -275,14 +356,20 @@ def export_bp():
 
 @app.route("/export/sugar")
 def export_sugar():
+    if "user_id" not in session:
+        return redirect("/login")
 
     conn = sqlite3.connect(DATABASE)
 
     rows = conn.execute("""
         SELECT recorded_at, glucose, unit, context
         FROM blood_sugar
+        WHERE user_id = ?
         ORDER BY recorded_at DESC
-    """).fetchall()
+        """,
+        (
+            session["user_id"],
+        )).fetchall()
 
     conn.close()
 

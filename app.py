@@ -5,15 +5,42 @@ from flask import Flask, render_template, request, redirect, Response
 import sqlite3
 from flask import send_from_directory
 from flask import jsonify
+from flask_login import LoginManager, login_user, current_user, logout_user, login_required
 from werkzeug.security import generate_password_hash
 from werkzeug.security import check_password_hash
 from datetime import datetime
 from db import query, execute
-from auth import login_required, login_user, logout_user, current_user_id
+from models import User
 
 app = Flask(__name__)
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login"
 app.secret_key = "ThisIsASecretKeyForMe:)"
 
+@login_manager.user_loader
+def load_user(user_id):
+
+    row = query(
+        """
+        SELECT id, username, password
+        FROM users
+        WHERE id = ?
+        """,
+        (user_id,),
+        one=True
+    )
+
+    if row is None:
+        return None
+
+    return User(
+        row["id"],
+        row["username"],
+        row["password"]
+    )
+    
+    
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -27,7 +54,13 @@ def login():
         )
         
         if user and check_password_hash(user[2], password):
-            login_user((user[0], user[1]))
+            login_user(
+                User(
+                    user["id"],
+                    user["username"],
+                    user["password"]
+                )
+            )
             return redirect("/")
         else:
             return render_template("login.html",
@@ -78,7 +111,7 @@ def home():
             WHERE user_id = ?
             ORDER BY recorded_at DESC
             LIMIT 1
-        """, (current_user_id(),), one=True)
+        """, (current_user.id,), one=True)
 
     # Latest blood sugar
     sugar = query("""
@@ -87,7 +120,7 @@ def home():
         WHERE user_id = ?
         ORDER BY recorded_at DESC
         LIMIT 1
-        """, (current_user_id(),), one=True)
+        """, (current_user.id,), one=True)
 
     # 7-day BP average
     bp_avg = query("""
@@ -96,14 +129,14 @@ def home():
             AVG(diastolic)
         FROM blood_pressure
         WHERE user_id = ? AND recorded_at >= datetime('now', '-7 days')
-        """, (current_user_id(),), one=True)
+        """, (current_user.id,), one=True)
 
     # 7-day sugar average
     sugar_avg = query("""
         SELECT AVG(glucose)
         FROM blood_sugar
         WHERE user_id = ? AND recorded_at >= datetime('now', '-7 days')
-        """, (current_user_id(),), one=True)
+        """, (current_user.id,), one=True)
 
     return render_template(
         "index.html",
@@ -126,7 +159,7 @@ def add_bp():
         execute("""
         INSERT INTO blood_pressure (user_id, systolic, diastolic, pulse, recorded_at)
         VALUES (?, ?, ?, ?, ?)
-        """, (current_user_id(), systolic, diastolic, pulse, datetime.now()))
+        """, (current_user.id, systolic, diastolic, pulse, datetime.now()))
 
         return redirect("/bp/history")
 
@@ -142,7 +175,7 @@ def bp_history():
         FROM blood_pressure
         WHERE user_id = ?
         ORDER BY recorded_at DESC
-        """, (current_user_id(),), one=False)
+        """, (current_user.id,), one=False)
 
     return render_template(
         "bp_history.html",
@@ -164,7 +197,7 @@ def add_sugar():
             VALUES (?, ?, ?, ?, ?)
         """,
         (
-            current_user_id(),
+            current_user.id,
             glucose,
             unit,
             context,
@@ -184,7 +217,7 @@ def sugar_history():
         FROM blood_sugar
         WHERE user_id = ?
         ORDER BY recorded_at DESC
-        """, (current_user_id(),), one=False)
+        """, (current_user.id,), one=False)
 
     return render_template("sugar_history.html", readings=readings)
     
@@ -198,7 +231,7 @@ def charts():
         WHERE user_id = ?
         ORDER BY recorded_at DESC
         LIMIT 20
-        """, (current_user_id(),), one=False)
+        """, (current_user.id,), one=False)
 
     sugar = query("""
         SELECT recorded_at, glucose
@@ -206,7 +239,7 @@ def charts():
         WHERE user_id = ?
         ORDER BY recorded_at DESC
         LIMIT 20
-        """, (current_user_id(),), one=False)
+        """, (current_user.id,), one=False)
 
     # reverse so charts go left → right in time order
     bp = bp[::-1]
@@ -223,7 +256,7 @@ def export_bp():
         FROM blood_pressure
         WHERE user_id = ?
         ORDER BY recorded_at DESC
-        """, (current_user_id(),), one=False)
+        """, (current_user.id,), one=False)
 
     output = StringIO()
     writer = csv.writer(output)
@@ -255,7 +288,7 @@ def export_sugar():
         FROM blood_sugar
         WHERE user_id = ?
         ORDER BY recorded_at DESC
-        """, (current_user_id(),), one=False)
+        """, (current_user.id,), one=False)
 
     output = StringIO()
     writer = csv.writer(output)

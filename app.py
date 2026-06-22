@@ -48,12 +48,15 @@ def login():
         password = request.form["password"]
 
         user = query(
-            "SELECT id, username, password FROM users WHERE username = ?",
-            (username,),
+            """SELECT id, username, email, password
+            FROM users
+            WHERE email = ? OR username = ?
+            """,
+            (username, username),
             one=True
         )
         
-        if user and check_password_hash(user[2], password):
+        if user and check_password_hash(user["password"], password):
             login_user(
                 User(
                     user["id"],
@@ -67,6 +70,7 @@ def login():
                                    error="Wrong login")
 
     return render_template("login.html")
+
 
 @app.route("/logout")
 def logout():

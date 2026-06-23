@@ -35,6 +35,15 @@ def create_db():
         )
     """)
 
+    conn.execute(""" 
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            expires_at DATETIME NOT NULL
+        );        
+    """)
+
     conn.commit()
     conn.close()
     print("Database schema created successfully.")

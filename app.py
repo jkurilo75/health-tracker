@@ -8,9 +8,23 @@ from flask import jsonify
 from flask_login import LoginManager, login_user, current_user, logout_user, login_required
 from werkzeug.security import generate_password_hash
 from werkzeug.security import check_password_hash
-from datetime import datetime
-from db import query, execute
+from datetime import datetime, timedelta
+from db import query, execute, get_connection
 from models import User
+import smtplib
+import ssl
+from email.message import EmailMessage
+import secrets
+from dotenv import load_dotenv
+import requests
+
+project_folder = os.path.expanduser('~/health_tracker')
+load_dotenv(os.path.join(project_folder, '.env'))
+EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+print("EMAIL_ADDRESS:", EMAIL_ADDRESS)
+print("EMAIL_PASSWORD loaded:", EMAIL_PASSWORD is not None)
 
 app = Flask(__name__)
 login_manager = LoginManager()
@@ -104,6 +118,163 @@ def register():
 
     return render_template("register.html")
     
+
+def cleanup_expired_reset_tokens():
+    conn = get_connection()
+    conn.execute("""
+        DELETE FROM password_reset_tokens
+        WHERE expires_at < datetime('now')
+    """)
+    conn.commit()
+    conn.close()
+    
+    
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+
+    if request.method == "POST":
+        cleanup_expired_reset_tokens()
+        email = request.form["email"]
+
+        user = query(
+            "SELECT id, email FROM users WHERE email = ?",
+            (email,),
+            one=True
+        )
+
+        if not user:
+            return render_template(
+                "forgot_password.html",
+                error="Email not found"
+            )
+
+        # generate token
+        token = secrets.token_urlsafe(32)
+
+        expires = datetime.utcnow() + timedelta(hours=1)
+
+        conn = get_connection()
+        conn.execute("""
+            INSERT INTO password_reset_tokens (user_id, token, expires_at)
+            VALUES (?, ?, ?)
+        """, (user["id"], token, expires))
+        conn.commit()
+        conn.close()
+
+        reset_link = f"http://localhost:5000/reset-password/{token}"
+
+        # send email
+        try:
+            send_email(email, reset_link)
+        except Exception as e:
+            print("EMAIL ERROR:", e)
+            raise
+
+        return render_template(
+            "forgot_password.html",
+            message="Check your email"
+        )
+
+    return render_template("forgot_password.html")
+
+
+def send_gmail_email(to_email, reset_link):
+
+    msg = EmailMessage()
+    msg["Subject"] = "Password Reset"
+    msg["From"] = EMAIL_ADDRESS
+    msg["To"] = to_email
+
+    msg.set_content(f"""
+    Click the link to reset your password:
+
+    {reset_link}
+
+    This link expires in 1 hour.
+    """)
+
+    context = ssl.create_default_context()
+
+    with smtplib.SMTP("smtp.gmail.com", 587, timeout=10) as smtp:
+        smtp.ehlo()
+        smtp.starttls(context=context)
+        smtp.ehlo()
+
+        smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+        smtp.send_message(msg)
+
+
+def send_email(to_email, reset_link):
+    url = "https://api.resend.com/emails"
+
+    headers = {
+        "Authorization": f"Bearer {RESEND_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "from": "onboarding@resend.dev",
+        "to": [to_email],
+        "subject": "Password Reset",
+        "html": f"""
+            <p>Click here:</p>
+            <a href="{reset_link}">{reset_link}</a>
+        """
+    }
+
+    response = requests.post(url, json=data, headers=headers)
+
+    print("STATUS:", response.status_code)
+    print("BODY:", response.text)
+
+    if response.status_code >= 400:
+        raise Exception(response.text)        
+
+        
+@app.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+
+    row = conn.execute("""
+        SELECT user_id, expires_at
+        FROM password_reset_tokens
+        WHERE token = ?
+    """, (token,)).fetchone()
+
+    if not row:
+        return "Invalid token"
+
+    if datetime.utcnow() > datetime.fromisoformat(row["expires_at"]):
+        return "Token expired"
+
+    if request.method == "POST":
+
+        new_password = generate_password_hash(
+            request.form["password"]
+        )
+
+        conn.execute("""
+            UPDATE users
+            SET password = ?
+            WHERE id = ?
+        """, (new_password, row["user_id"]))
+
+        conn.execute("""
+            DELETE FROM password_reset_tokens
+            WHERE token = ?
+        """, (token,))
+
+        conn.commit()
+        conn.close()
+
+        return redirect("/login")
+
+    conn.close()
+
+    return render_template("reset_password.html")
+
     
 @app.route("/")
 @login_required

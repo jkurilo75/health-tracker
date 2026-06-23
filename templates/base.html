@@ -24,16 +24,22 @@
                 Health Tracker
             </a>
             
-            <span class="navbar-text me-3">
+			<span class="navbar-text me-3">
 				{% if current_user.is_authenticated %}
 					Logged in as {{ current_user.username }}
 				{% endif %}
 			</span>
-            
-            <a href="/logout" class="btn btn-sm btn-danger">
-                Logout
-            </a>
 
+			{% if current_user.is_authenticated %}
+				<a href="/logout" class="btn btn-sm btn-danger">
+					Logout
+				</a>
+			{% else %}
+				<a href="/login" class="btn btn-sm btn-primary">
+					Login
+				</a>
+			{% endif %}
+			
         </div>
     </nav>
 

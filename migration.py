@@ -13,21 +13,17 @@ def run_migration():
     # 1. Add email column (safe)
     # -----------------------------
     try:
-        cur.execute("ALTER TABLE users ADD COLUMN email TEXT")
-        print("Added column: email")
+        cur.execute(""" 
+            CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token TEXT UNIQUE NOT NULL,
+                expires_at DATETIME NOT NULL
+            );        
+        """)
+        print("created table password_reset_tokens")
     except sqlite3.OperationalError as e:
         print("email column already exists:", e)
-
-    # -----------------------------
-    # 2. Assign email to existing user
-    # -----------------------------
-    cur.execute("""
-        UPDATE users
-        SET email = ?
-        WHERE username = ?
-    """, ("jkurilo75@gmail.com", "bilingo"))
-
-    print("Updated user email")
 
     conn.commit()
     conn.close()

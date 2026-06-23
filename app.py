@@ -17,6 +17,7 @@ from email.message import EmailMessage
 import secrets
 from dotenv import load_dotenv
 import requests
+import re
 
 project_folder = os.path.expanduser('~/health_tracker')
 load_dotenv(os.path.join(project_folder, '.env'))
@@ -92,6 +93,13 @@ def logout():
     return redirect("/login")
 
 
+EMAIL_REGEX = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+
+def is_valid_email(email: str) -> bool:
+    return re.match(EMAIL_REGEX, email) is not None
+    
+    
+    
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
@@ -109,9 +117,14 @@ def register():
 
         hashed = generate_password_hash(password)
 
+        email = request.form.get("username", "").strip()
+
+        if email and not is_valid_email(email):
+            email = None
+
         execute(
-            "INSERT INTO users (username, password) VALUES (?, ?)",
-            (username, hashed)
+            "INSERT INTO users (username, password, email) VALUES (?, ?, ?)",
+            (username, hashed, email if email else None)
         )
 
         return redirect("/login")

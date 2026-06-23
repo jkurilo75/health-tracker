@@ -40,10 +40,19 @@ def create_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
             token TEXT UNIQUE NOT NULL,
-            expires_at DATETIME NOT NULL
+            expires_at DATETIME NOT NULL,
+            used INTEGER DEFAULT 0
         );        
     """)
 
+    conn.execute(""" 
+        CREATE TABLE IF NOT EXISTS password_reset_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT,
+            requested_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    
     conn.commit()
     conn.close()
     print("Database schema created successfully.")

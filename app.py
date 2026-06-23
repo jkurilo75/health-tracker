@@ -128,14 +128,53 @@ def cleanup_expired_reset_tokens():
     conn.commit()
     conn.close()
     
+
+def log_reset_request(email):
+    conn = get_connection()
+    conn.execute("""
+        INSERT INTO password_reset_requests (email)
+        VALUES (?)
+    """, (email,))
+    conn.commit()
+    conn.close()
+    
+    
+def can_request_reset(email):
+    conn = get_connection()
+
+    cur = conn.execute("""
+        SELECT COUNT(*)
+        FROM password_reset_requests
+        WHERE email = ?
+          AND requested_at > datetime('now', '-10 minutes')
+    """, (email,))
+
+    count = cur.fetchone()[0]
+    conn.close()
+
+    return count < 3
+
+
+def cleanup_reset_requests():
+    execute("""
+        DELETE FROM password_reset_requests
+        WHERE requested_at < datetime('now', '-1 day')
+    """)
+
     
 @app.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
 
     if request.method == "POST":
         cleanup_expired_reset_tokens()
+        cleanup_reset_requests()
         email = request.form["email"]
 
+        if not can_request_reset(email):
+            return "Too many requests. Try again later."
+        
+        log_reset_request(email)
+        
         user = query(
             "SELECT id, email FROM users WHERE email = ?",
             (email,),
@@ -230,48 +269,56 @@ def send_email(to_email, reset_link):
     if response.status_code >= 400:
         raise Exception(response.text)        
 
-        
-@app.route("/reset-password/<token>", methods=["GET", "POST"])
-def reset_password(token):
 
+def claim_reset_token(token):
     conn = get_connection()
-    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
 
-    row = conn.execute("""
-        SELECT user_id, expires_at
-        FROM password_reset_tokens
+    cur.execute("""
+        UPDATE password_reset_tokens
+        SET used = 1
         WHERE token = ?
-    """, (token,)).fetchone()
+          AND used = 0
+          AND expires_at > datetime('now')
+    """, (token,))
 
-    if not row:
-        return "Invalid token"
+    conn.commit()
 
-    if datetime.utcnow() > datetime.fromisoformat(row["expires_at"]):
-        return "Token expired"
+    if cur.rowcount == 0:
+        conn.close()
+        return False  # invalid, expired or already used
+
+    conn.close()
+    return True
+
+    
+@app.route("/reset-password", methods=["GET", "POST"])
+def reset_password():
+    token = request.args.get("token")
 
     if request.method == "POST":
 
-        new_password = generate_password_hash(
-            request.form["password"]
-        )
+        new_password = request.form["password"]
+        hashed = generate_password_hash(new_password)
 
+        if not claim_reset_token(token):
+            return "Invalid or expired token"
+
+        conn = get_connection()
         conn.execute("""
             UPDATE users
             SET password = ?
-            WHERE id = ?
-        """, (new_password, row["user_id"]))
-
-        conn.execute("""
-            DELETE FROM password_reset_tokens
-            WHERE token = ?
-        """, (token,))
+            WHERE id = (
+                SELECT user_id
+                FROM password_reset_tokens
+                WHERE token = ?
+            )
+        """, (hashed, token))
 
         conn.commit()
         conn.close()
 
         return redirect("/login")
-
-    conn.close()
 
     return render_template("reset_password.html")
 

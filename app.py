@@ -1,7 +1,7 @@
 import os
 import csv
 from io import StringIO
-from flask import Flask, render_template, request, redirect, Response
+from flask import Flask, render_template, request, redirect, Response, url_for
 import sqlite3
 from flask import send_from_directory
 from flask import jsonify
@@ -18,20 +18,45 @@ import secrets
 from dotenv import load_dotenv
 import requests
 import re
+from authlib.integrations.flask_client import OAuth
 
 project_folder = os.path.expanduser('~/health_tracker')
 load_dotenv(os.path.join(project_folder, '.env'))
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
-print("EMAIL_ADDRESS:", EMAIL_ADDRESS)
-print("EMAIL_PASSWORD loaded:", EMAIL_PASSWORD is not None)
+#print("EMAIL_ADDRESS:", EMAIL_ADDRESS)
+#print("EMAIL_PASSWORD loaded:", EMAIL_PASSWORD is not None)
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+#print("CLIENT_ID:", GOOGLE_CLIENT_ID)
+#print("CLIENT_SECRET loaded:", GOOGLE_CLIENT_SECRET is not None)
 
 app = Flask(__name__)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 app.secret_key = "ThisIsASecretKeyForMe:)"
+
+oauth = OAuth(app)
+google = oauth.register(
+    name="google",
+    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    access_token_url="https://oauth2.googleapis.com/token",
+    authorize_url="https://accounts.google.com/o/oauth2/auth",
+    api_base_url="https://www.googleapis.com/oauth2/v1/",
+    client_kwargs={"scope": "email profile"},
+)
+
+#google = oauth.register(
+#    name="google",
+#    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+#    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+#    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+#    client_kwargs={"scope": "openid email profile"},
+#)
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -91,6 +116,71 @@ def login():
 def logout():
     logout_user()
     return redirect("/login")
+
+
+@app.route("/login/google")
+def login_google():
+    redirect_uri = url_for("google_callback", _external=True)
+    return google.authorize_redirect(redirect_uri)
+
+
+@app.route("/auth/google/callback")
+def google_callback():
+    token = google.authorize_access_token()
+
+    #user_info = token["userinfo"]
+    #user_info = google.get("userinfo").json()
+    resp = google.get("userinfo")
+    user_info = resp.json()
+
+    google_id = user_info["id"]
+    email = user_info["email"]
+    username = user_info.get("name", email.split("@")[0])
+
+    # Find by Google ID first
+    user = query("""
+        SELECT *
+        FROM users
+        WHERE google_id = ?
+    """, (google_id,), one=True)
+
+    # Existing local account? Link it.
+    if user is None:
+        user = query("""
+            SELECT *
+            FROM users
+            WHERE email = ?
+        """, (email,), one=True)
+
+        if user:
+            execute("""
+                UPDATE users
+                SET google_id = ?, auth_provider = 'google'
+                WHERE id = ?
+            """, (google_id, user["id"]))
+
+            user = query(
+                "SELECT * FROM users WHERE id = ?",
+                (user["id"],),
+                one=True
+            )
+
+    # Brand new Google user
+    if user is None:
+        execute("""
+            INSERT INTO users (username, email, google_id, auth_provider)
+            VALUES (?, ?, ?, 'google')
+        """, (username, email, google_id))
+
+        user = query("""
+            SELECT *
+            FROM users
+            WHERE google_id = ?
+        """, (google_id,), one=True)
+
+    login_user(User(user["id"], user["username"], user["password"]))
+
+    return redirect("/")
 
 
 EMAIL_REGEX = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"

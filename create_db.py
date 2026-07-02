@@ -10,7 +10,9 @@ def create_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
-            email TEXT
+            email TEXT,
+            google_id TEXT,
+            auth_provider TEXT DEFAULT 'local'
         )
     """)
 

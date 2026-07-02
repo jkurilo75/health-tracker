@@ -14,24 +14,20 @@ def run_migration():
     # -----------------------------
     try:
         cur.execute("""
-            ALTER TABLE password_reset_tokens ADD COLUMN used INTEGER DEFAULT 0;
+            ALTER TABLE users ADD COLUMN google_id TEXT;
         """)
-        print("added field used to password_reset_tokens")
+        print("added field google_id to users")
     except sqlite3.OperationalError as e:
-        print("failed to add field used to password_reset_tokens", e)
+        print("failed to add field google_id to users", e)
 
     try:
         cur.execute(""" 
-            CREATE TABLE IF NOT EXISTS password_reset_requests (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT,
-                requested_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
+            ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'local';
         """)
-        print("created password_reset_requests table")
+        print("added field auth_provider to users")
         
     except sqlite3.OperationalError as e:
-        print("failed to create password_reset_requests table", e)
+        print("failed to add field auth_provider to users", e)
         
     conn.commit()
     conn.close()

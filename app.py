@@ -636,19 +636,5 @@ def export_sugar():
         }
     )
     
-    
-@app.route("/sw.js")
-def sw():
-    return send_from_directory(
-        "static",
-        "sw.js",
-        mimetype="application/javascript"
-    )
-
-@app.route("/notify-sugar")
-def notify_sugar():
-    return jsonify({"status": "ok"})
-
-
 if __name__ == "__main__":
     app.run(debug=True)

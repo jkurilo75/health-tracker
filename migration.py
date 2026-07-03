@@ -14,21 +14,12 @@ def run_migration():
     # -----------------------------
     try:
         cur.execute("""
-            ALTER TABLE users ADD COLUMN google_id TEXT;
+            UPDATE blood_sugar SET context = 'Before 1st meal' WHERE context = 'Before meal';
         """)
-        print("added field google_id to users")
+        print("modified blood_sugar.context")
     except sqlite3.OperationalError as e:
-        print("failed to add field google_id to users", e)
+        print("failed to modified blood_sugar.context", e)
 
-    try:
-        cur.execute(""" 
-            ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'local';
-        """)
-        print("added field auth_provider to users")
-        
-    except sqlite3.OperationalError as e:
-        print("failed to add field auth_provider to users", e)
-        
     conn.commit()
     conn.close()
 

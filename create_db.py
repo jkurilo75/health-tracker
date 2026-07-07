@@ -56,6 +56,42 @@ def create_db():
         );
     """)
     
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS meals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            meal_type TEXT, -- Breakfast, Lunch, Dinner, Supper, Snack
+            portion_size TEXT, -- Small, Medium, Large
+            carbs_pct INTEGER,
+            protein_pct INTEGER,
+            fat_pct INTEGER,
+            photo_path TEXT,
+            notes TEXT,
+            recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS exercises (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            activity TEXT NOT NULL,
+            intensity TEXT,
+            duration_minutes INTEGER,
+            recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS medications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            medication TEXT NOT NULL, -- Metformin, Viacoram
+            dose TEXT,
+            recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+
     conn.commit()
     conn.close()
     print("Database schema created successfully.")

@@ -511,6 +511,35 @@ def bp_history():
 @app.route("/sugar/add", methods=["GET", "POST"])
 @login_required
 def add_sugar():
+
+    last_meal = query("""
+        SELECT meal_type, recorded_at
+        FROM meals
+        WHERE user_id = ?
+        ORDER BY recorded_at DESC
+        LIMIT 1
+    """, (current_user.id,), one=True)
+
+    last_exercise = query("""
+        SELECT activity, intensity, recorded_at
+        FROM exercises
+        WHERE user_id = ?
+        ORDER BY recorded_at DESC
+        LIMIT 1
+    """, (current_user.id,), one=True)
+
+    last_medication = query("""
+        SELECT medication, dose, recorded_at
+        FROM medications
+        WHERE user_id = ?
+        ORDER BY recorded_at DESC
+        LIMIT 1
+    """, (current_user.id,), one=True)
+
+    meal_age = time_ago(last_meal["recorded_at"]) if last_meal else None
+    exercise_age = time_ago(last_exercise["recorded_at"]) if last_exercise else None
+    medication_age = time_ago(last_medication["recorded_at"]) if last_medication else None
+
     if request.method == "POST":
 
         glucose = request.form["glucose"]
@@ -531,7 +560,15 @@ def add_sugar():
 
         return redirect("/sugar/history")
 
-    return render_template("add_sugar.html")
+    return render_template(
+        "add_sugar.html",
+        last_meal=last_meal,
+        last_exercise=last_exercise,
+        last_medication=last_medication,
+        meal_age=meal_age,
+        exercise_age=exercise_age,
+        medication_age=medication_age        
+    )
     
     
 @app.route("/sugar/history")
@@ -635,6 +672,156 @@ def export_sugar():
             "attachment; filename=blood_sugar.csv"
         }
     )
-    
+
+
+def time_ago(timestamp):
+    if not timestamp:
+        return ""
+
+    if isinstance(timestamp, str):
+        timestamp = datetime.fromisoformat(timestamp)
+
+    diff = datetime.now() - timestamp
+
+    seconds = diff.total_seconds()
+
+    if seconds < 60:
+        return "just now"
+
+    minutes = int(seconds / 60)
+
+    if minutes < 60:
+        return f"{minutes} min ago"
+
+    hours = int(minutes / 60)
+
+    if hours < 24:
+        return f"{hours} h ago"
+
+    days = int(hours / 24)
+
+    return f"{days} day ago" if days == 1 else f"{days} days ago"
+
+
+@app.route("/meals/add", methods=["GET", "POST"])
+@login_required
+def add_meal():
+
+    if request.method == "POST":
+
+        meal_type = request.form["meal_type"]
+        portion = request.form["portion"]
+
+        carbs = int(request.form["carbs"])
+        protein = int(request.form["protein"])
+        fat = int(request.form["fat"])
+
+        # safety check: percentages must add up to 100
+        if carbs + protein + fat != 100:
+            return render_template(
+                "add_meal.html",
+                error="Carbs + protein + fat must equal 100%"
+            )
+
+        execute("""
+            INSERT INTO meals
+            (
+                user_id,
+                meal_type,
+                portion_size,
+                carbs_pct,
+                protein_pct,
+                fat_pct,
+                recorded_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            current_user.id,
+            meal_type,
+            portion,
+            carbs,
+            protein,
+            fat,
+            datetime.now()
+        ))
+
+        return redirect("/sugar/add")
+
+
+    return render_template("add_meal.html")
+
+
+@app.route("/medications/add", methods=["GET", "POST"])
+@login_required
+def add_medication():
+
+    if request.method == "POST":
+
+        medication = request.form["medication"]
+        dose = request.form["dose"]
+
+
+        execute("""
+            INSERT INTO medications
+            (
+                user_id,
+                medication,
+                dose,
+                recorded_at
+            )
+            VALUES (?, ?, ?, ?)
+        """,
+        (
+            current_user.id,
+            medication,
+            dose,
+            datetime.now()
+        ))
+
+
+        return redirect("/sugar/add")
+
+
+    return render_template("add_medication.html")
+
+
+@app.route("/exercise/add", methods=["GET", "POST"])
+@login_required
+def add_exercise():
+
+    if request.method == "POST":
+
+        activity = request.form["activity"]
+        intensity = request.form["intensity"]
+        duration = request.form["duration"]
+
+
+        execute("""
+            INSERT INTO exercises
+            (
+                user_id,
+                activity,
+                intensity,
+                duration_minutes,
+                recorded_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            current_user.id,
+            activity,
+            intensity,
+            duration,
+            datetime.now()
+        ))
+
+
+        return redirect("/sugar/add")
+
+
+    return render_template("add_exercise.html")
+
+
 if __name__ == "__main__":
     app.run(debug=True)

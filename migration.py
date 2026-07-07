@@ -14,11 +14,43 @@ def run_migration():
     # -----------------------------
     try:
         cur.execute("""
-            UPDATE blood_sugar SET context = 'Before 1st meal' WHERE context = 'Before meal';
+            CREATE TABLE IF NOT EXISTS meals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                meal_type TEXT, -- Breakfast, Lunch, Dinner, Supper, Snack
+                portion_size TEXT, -- Small, Medium, Large
+                carbs_pct INTEGER,
+                protein_pct INTEGER,
+                fat_pct INTEGER,
+                photo_path TEXT,
+                notes TEXT,
+                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
         """)
-        print("modified blood_sugar.context")
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS exercises (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                activity TEXT NOT NULL,
+                intensity TEXT,
+                duration_minutes INTEGER,
+                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS medications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                medication TEXT NOT NULL, -- Metformin, Viacoram
+                dose TEXT,
+                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        print("created tables meals, exercise, medications")
     except sqlite3.OperationalError as e:
-        print("failed to modified blood_sugar.context", e)
+        print("failed to create tables meals, exercise, medications", e)
 
     conn.commit()
     conn.close()

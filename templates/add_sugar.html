@@ -6,6 +6,65 @@
 
 <form method="post">
 
+    <div class="card mb-3">
+        <div class="card-body">
+
+            <div class="d-flex justify-content-between mb-2">
+                <div>
+                    <strong>Last meal:</strong>
+                    {% if last_meal %}
+                        {{ last_meal["meal_type"] }}
+                        ({{ meal_age }})
+                    {% else %}
+                        None recorded
+                    {% endif %}
+                </div>
+
+                <a href="/meals/add" class="btn btn-sm btn-outline-primary">
+                    Add meal
+                </a>
+            </div>
+
+            <div class="d-flex justify-content-between mb-2">
+                <div>
+                    <strong>Last exercise:</strong>
+                    {% if last_exercise %}
+                        {{ last_exercise["activity"] }}
+                        {% if last_exercise["intensity"] %}
+                            ({{ last_exercise["intensity"] }} / {{exercise_age}})
+                        {% endif %}
+                    {% else %}
+                        None recorded
+                    {% endif %}
+                </div>
+
+                <a href="/exercise/add" class="btn btn-sm btn-outline-success">
+                    Add exercise
+                </a>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <div>
+                    <strong>Last medication:</strong>
+                    {% if last_medication %}
+                        {{ last_medication["medication"] }}
+                        {% if last_medication["dose"] %}
+                            {{ last_medication["dose"] }}
+                        {% endif %}
+                        ({{medication_age}})
+                    {% else %}
+                        None recorded
+                    {% endif %}
+                </div>
+
+                <a href="/medications/add" class="btn btn-sm btn-outline-warning">
+                    Add medication
+                </a>
+            </div>
+
+        </div>
+    </div>
+
     <div class="mb-3">
         <label class="form-label">Glucose</label>
         <input type="number" step="0.1" class="form-control" name="glucose" required>

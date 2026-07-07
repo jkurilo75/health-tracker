@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}Add Meal{% endblock %}
+
+{% block content %}
+
+<h3 class="mb-4">Add Meal</h3>
+
+<form method="post">
+
+    <!-- Meal type -->
+    <div class="mb-3">
+        <label class="form-label">Meal</label>
+        <select class="form-control" name="meal_type">
+            <option>Breakfast</option>
+            <option>Lunch</option>
+            <option>Dinner</option>
+            <option>Snack</option>
+        </select>
+    </div>
+
+    <!-- Portion -->
+    <div class="mb-4">
+        <label class="form-label">Portion size</label>
+
+        <div class="form-check">
+            <input class="form-check-input"
+                   type="radio"
+                   name="portion"
+                   value="Small"
+                   id="small">
+            <label class="form-check-label" for="small">
+                Small
+            </label>
+        </div>
+
+        <div class="form-check">
+            <input class="form-check-input"
+                   type="radio"
+                   name="portion"
+                   value="Medium"
+                   id="medium"
+                   checked>
+            <label class="form-check-label" for="medium">
+                Medium
+            </label>
+        </div>
+
+        <div class="form-check">
+            <input class="form-check-input"
+                   type="radio"
+                   name="portion"
+                   value="Large"
+                   id="large">
+            <label class="form-check-label" for="large">
+                Large
+            </label>
+        </div>
+    </div>
+
+    <!-- Carbohydrates -->
+    <div class="mb-3">
+        <label class="form-label">
+            Carbohydrates:
+            <span id="carbsValue">50</span>%
+        </label>
+
+        <input
+            type="range"
+            class="form-range"
+            min="0"
+            max="100"
+            value="50"
+            name="carbs"
+            id="carbs">
+    </div>
+
+
+    <!-- Protein -->
+    <div class="mb-3">
+        <label class="form-label">
+            Protein:
+            <span id="proteinValue">30</span>%
+        </label>
+
+        <input
+            type="range"
+            class="form-range"
+            min="0"
+            max="100"
+            value="30"
+            name="protein"
+            id="protein">
+    </div>
+
+
+    <!-- Fat -->
+    <div class="mb-3">
+        <label class="form-label">
+            Fat:
+            <span id="fatValue">20</span>%
+        </label>
+
+        <input
+            type="range"
+            class="form-range"
+            min="0"
+            max="100"
+            value="20"
+            name="fat"
+            id="fat">
+    </div>
+
+
+    <div class="alert alert-secondary">
+        Total:
+        <strong><span id="total">100</span>%</strong>
+    </div>
+
+    <div class="d-flex gap-2">
+        <a href="/sugar/add" class="btn btn-secondary">
+        Back
+        </a>
+
+        <button class="btn btn-success" type="submit">
+            Save Meal
+        </button>
+
+        <button 
+            class="btn btn-secondary" 
+            type="button"
+            onclick="restoreDefaults()">
+            Restore
+        </button>
+
+        <button 
+            class="btn btn-warning" 
+            type="button"
+            onclick="setKeto()">
+            Keto diet
+        </button>        
+    </div>
+
+</form>
+
+<script>
+
+let sliders = {
+    carbs: document.getElementById("carbs"),
+    protein: document.getElementById("protein"),
+    fat: document.getElementById("fat")
+};
+
+let values = {
+    carbs: document.getElementById("carbsValue"),
+    protein: document.getElementById("proteinValue"),
+    fat: document.getElementById("fatValue")
+};
+
+
+// Save initial ratios once when page loads
+let initialRatios = {};
+
+Object.keys(sliders).forEach(key => {
+    initialRatios[key] = parseInt(sliders[key].value);
+});
+
+function restoreDefaults() {
+
+    for (let key in sliders) {
+        sliders[key].value = initialRatios[key];
+    }
+
+    updateDisplay();
+}
+
+function setKeto() {
+
+    sliders.carbs.value = 0;
+    sliders.protein.value = 50;
+    sliders.fat.value = 50;
+
+    updateDisplay();
+
+    Object.keys(sliders).forEach(key => {
+        initialRatios[key] = parseInt(sliders[key].value);
+    });
+}
+
+// Calculate the ratio of the two untouched sliders
+function redistribute(changed) {
+
+    let remaining = 100 - parseInt(sliders[changed].value);
+
+    let others = Object.keys(sliders)
+        .filter(x => x !== changed);
+
+
+    let first = others[0];
+    let second = others[1];
+
+
+    let firstRatio =
+        initialRatios[first] /
+        (initialRatios[first] + initialRatios[second]);
+
+
+    let firstValue = Math.floor(
+        remaining * firstRatio
+    );
+
+
+    let secondValue = remaining - firstValue;
+
+
+    sliders[first].value = firstValue;
+    sliders[second].value = secondValue;
+
+
+    updateDisplay();
+}
+
+
+function updateDisplay() {
+
+    for (let key in sliders) {
+        values[key].textContent =
+            sliders[key].value;
+    }
+}
+
+
+sliders.carbs.addEventListener(
+    "input",
+    () => redistribute("carbs")
+);
+
+sliders.protein.addEventListener(
+    "input",
+    () => redistribute("protein")
+);
+
+sliders.fat.addEventListener(
+    "input",
+    () => redistribute("fat")
+);
+
+
+updateDisplay();
+
+</script>
+
+{% endblock %}

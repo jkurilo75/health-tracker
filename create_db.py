@@ -9,7 +9,7 @@ def create_db():
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
+            password TEXT,
             email TEXT,
             google_id TEXT,
             auth_provider TEXT DEFAULT 'local'
@@ -65,6 +65,10 @@ def create_db():
             carbs_pct INTEGER,
             protein_pct INTEGER,
             fat_pct INTEGER,
+            carbs_grams REAL,
+            protein_grams REAL,
+            fat_grams REAL,
+            product_weight_grams REAL,
             photo_path TEXT,
             notes TEXT,
             recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP

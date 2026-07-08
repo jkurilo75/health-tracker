@@ -19,9 +19,15 @@ from dotenv import load_dotenv
 import requests
 import re
 from authlib.integrations.flask_client import OAuth
+from pathlib import Path
+import uuid
+from google_drive import upload_to_drive
 
-project_folder = os.path.expanduser('~/health_tracker')
-load_dotenv(os.path.join(project_folder, '.env'))
+#project_folder = os.path.expanduser('~/health_tracker')
+#load_dotenv(os.path.join(project_folder, '.env'))
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
+
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
@@ -31,6 +37,8 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 #print("CLIENT_ID:", GOOGLE_CLIENT_ID)
 #print("CLIENT_SECRET loaded:", GOOGLE_CLIENT_SECRET is not None)
+UPLOAD_FOLDER = Path(os.getenv("UPLOAD_FOLDER", BASE_DIR / "uploads"))
+UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 app = Flask(__name__)
 login_manager = LoginManager()
@@ -46,7 +54,8 @@ google = oauth.register(
     access_token_url="https://oauth2.googleapis.com/token",
     authorize_url="https://accounts.google.com/o/oauth2/auth",
     api_base_url="https://www.googleapis.com/oauth2/v1/",
-    client_kwargs={"scope": "email profile"},
+    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+    client_kwargs={"scope": "openid email profile https://www.googleapis.com/auth/drive.file"},
 )
 
 #google = oauth.register(
@@ -703,6 +712,12 @@ def time_ago(timestamp):
     return f"{days} day ago" if days == 1 else f"{days} days ago"
 
 
+
+def get_float(name):
+    value = request.form.get(name)
+    return float(value) if value else None
+
+
 @app.route("/meals/add", methods=["GET", "POST"])
 @login_required
 def add_meal():
@@ -715,13 +730,37 @@ def add_meal():
         carbs = int(request.form["carbs"])
         protein = int(request.form["protein"])
         fat = int(request.form["fat"])
-
         # safety check: percentages must add up to 100
         if carbs + protein + fat != 100:
             return render_template(
                 "add_meal.html",
                 error="Carbs + protein + fat must equal 100%"
             )
+
+        carbs_grams = get_float("carbs100")
+        protein_grams = get_float("protein100")
+        fat_grams = get_float("fat100")
+        product_weight_grams = get_float("product_weight")
+        if product_weight_grams:
+            carbs_grams = carbs_grams / 100 * product_weight_grams
+            protein_grams = protein_grams / 100 * product_weight_grams
+            fat_grams = fat_grams / 100 * product_weight_grams
+
+        photo_id = None
+        photo = request.files.get("photo")
+        if photo and photo.filename:
+            ext = os.path.splitext(photo.filename)[1]
+            filename = f"{uuid.uuid4()}{ext}"
+            temp_path = UPLOAD_FOLDER / filename
+            photo.save(temp_path)
+            photo_id = upload_to_drive(
+                filename,
+                str(temp_path),
+                photo.content_type
+            )
+
+            os.remove(temp_path)
+
 
         execute("""
             INSERT INTO meals
@@ -732,9 +771,14 @@ def add_meal():
                 carbs_pct,
                 protein_pct,
                 fat_pct,
-                recorded_at
+                carbs_grams,
+                protein_grams,
+                fat_grams,
+                product_weight_grams,                
+                recorded_at,
+                photo_path
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             current_user.id,
@@ -743,11 +787,16 @@ def add_meal():
             carbs,
             protein,
             fat,
-            datetime.now()
+            carbs_grams,
+            protein_grams,
+            fat_grams,
+            product_weight_grams,
+            datetime.now(),
+            photo_id
         ))
 
+ 
         return redirect("/sugar/add")
-
 
     return render_template("add_meal.html")
 
